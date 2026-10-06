@@ -1,0 +1,694 @@
+{
+  "meta": {
+    "project": "Genie Stability Score - Bramblepeak",
+    "version": "0.4",
+    "dataset": "bramblepeak_retail.sales (lab databricks-code-practice, Build a Genie Space)",
+    "conventions": {
+      "this_month": "latest month present in dim_date (MAX(year_month))",
+      "last_month": "second-latest month present in dim_date",
+      "last_quarter": "full calendar quarter before the quarter of the latest month in the data",
+      "region": "store region (dim_store.region) for any sales question"
+    },
+    "tolerance": {
+      "amount_relative": 0.005,
+      "percent_absolute": 0.5
+    },
+    "grading_outcomes": [
+      "correct",
+      "partial",
+      "incorrect",
+      "trap_hit",
+      "needs_review",
+      "no_answer"
+    ],
+    "notes": "French phrasings can be replaced with field vocabulary. Keep 5 FR + 5 EN per family.",
+    "grading_rules": [
+      "An answer is correct if it contains the requested information with the right values, even with extra columns.",
+      "An answer that arrives after the timeout but has a result is graded on its content and flagged as slow.",
+      "Partial: the right figures, but not at the requested level of detail (e.g. per region instead of company-wide)."
+    ],
+    "sets": {
+      "main": "10 phrasings per family, used to diagnose spaces A and B.",
+      "holdout": "New phrasings for F5 and F8, written after the diagnosis and never used to build the fixes of spaces C and D. They measure whether the fix generalises."
+    }
+  },
+  "families": [
+    {
+      "id": "F1",
+      "name": "Progress against this month's target",
+      "covered_by_certified_query": true,
+      "what_it_tests": "Covered by a certified query in space B (pacing vs target). Partial: right figures per region, but no company-level answer.",
+      "reference_sql": "WITH actual AS (\n  SELECT s.region, SUM(f.net_sales) AS revenue\n  FROM bramblepeak_retail.sales.fact_sales f\n  JOIN bramblepeak_retail.sales.dim_store s ON f.store_key = s.store_key\n  JOIN bramblepeak_retail.sales.dim_date d  ON f.date_key = d.date_key\n  WHERE d.year_month = (SELECT MAX(year_month) FROM bramblepeak_retail.sales.dim_date)\n  GROUP BY s.region\n)\nSELECT\n  ROUND(SUM(a.revenue))                                  AS company_actual_revenue,\n  ROUND(SUM(t.revenue_target))                           AS company_target,\n  ROUND(100 * SUM(a.revenue) / SUM(t.revenue_target), 1) AS pct_to_target\nFROM bramblepeak_retail.sales.sales_targets t\nJOIN actual a ON a.region = t.region\nWHERE t.year_month = (SELECT MAX(year_month) FROM bramblepeak_retail.sales.dim_date)",
+      "compare": {
+        "type": "values_present",
+        "match_any_of": [
+          [
+            "company_actual_revenue",
+            "company_target"
+          ],
+          [
+            "pct_to_target"
+          ]
+        ],
+        "partial_column": "revenue"
+      },
+      "trap_sql": null,
+      "variants": [
+        {
+          "id": "F1-EN1",
+          "lang": "en",
+          "text": "How are sales pacing against our monthly target?",
+          "set": "main"
+        },
+        {
+          "id": "F1-EN2",
+          "lang": "en",
+          "text": "Are we on track to hit this month's revenue target?",
+          "set": "main"
+        },
+        {
+          "id": "F1-EN3",
+          "lang": "en",
+          "text": "Revenue vs target this month?",
+          "set": "main"
+        },
+        {
+          "id": "F1-EN4",
+          "lang": "en",
+          "text": "Are we beating or missing plan this month?",
+          "set": "main"
+        },
+        {
+          "id": "F1-EN5",
+          "lang": "en",
+          "text": "What's our percent to target for the current month?",
+          "set": "main"
+        },
+        {
+          "id": "F1-FR1",
+          "lang": "fr",
+          "text": "Est-ce qu'on est en ligne avec l'objectif de CA ce mois-ci ?",
+          "set": "main"
+        },
+        {
+          "id": "F1-FR2",
+          "lang": "fr",
+          "text": "Où en est le réalisé par rapport au budget ce mois-ci ?",
+          "set": "main"
+        },
+        {
+          "id": "F1-FR3",
+          "lang": "fr",
+          "text": "On atteint l'objectif de ventes du mois ?",
+          "set": "main"
+        },
+        {
+          "id": "F1-FR4",
+          "lang": "fr",
+          "text": "Quel est notre taux d'atteinte de l'objectif ce mois-ci ?",
+          "set": "main"
+        },
+        {
+          "id": "F1-FR5",
+          "lang": "fr",
+          "text": "CA du mois vs objectif ?",
+          "set": "main"
+        }
+      ],
+      "partial_sql": "SELECT s.region, SUM(f.net_sales) AS revenue\nFROM bramblepeak_retail.sales.fact_sales f\nJOIN bramblepeak_retail.sales.dim_store s ON f.store_key = s.store_key\nJOIN bramblepeak_retail.sales.dim_date d  ON f.date_key = d.date_key\nWHERE d.year_month = (SELECT MAX(year_month) FROM bramblepeak_retail.sales.dim_date)\nGROUP BY s.region"
+    },
+    {
+      "id": "F2",
+      "name": "Regions below target this month",
+      "covered_by_certified_query": true,
+      "what_it_tests": "Covered by a certified query (regional pacing). Note: Genie may list every region with a status instead of filtering. A list of all regions with an ON/OFF TRACK status is accepted.",
+      "reference_sql": "WITH actual AS (\n  SELECT s.region, SUM(f.net_sales) AS revenue\n  FROM bramblepeak_retail.sales.fact_sales f\n  JOIN bramblepeak_retail.sales.dim_store s ON f.store_key = s.store_key\n  JOIN bramblepeak_retail.sales.dim_date d  ON f.date_key = d.date_key\n  WHERE d.year_month = (SELECT MAX(year_month) FROM bramblepeak_retail.sales.dim_date)\n  GROUP BY s.region\n)\nSELECT t.region\nFROM bramblepeak_retail.sales.sales_targets t\nJOIN actual a ON a.region = t.region\nWHERE t.year_month = (SELECT MAX(year_month) FROM bramblepeak_retail.sales.dim_date)\n  AND a.revenue < t.revenue_target\nORDER BY a.revenue / t.revenue_target",
+      "compare": {
+        "type": "label_set",
+        "column": "region",
+        "superset_ok_if_marked": [
+          "on track"
+        ]
+      },
+      "trap_sql": null,
+      "variants": [
+        {
+          "id": "F2-EN1",
+          "lang": "en",
+          "text": "Which regions are missing target this month, worst first?",
+          "set": "main"
+        },
+        {
+          "id": "F2-EN2",
+          "lang": "en",
+          "text": "Which regions are below their revenue target this month?",
+          "set": "main"
+        },
+        {
+          "id": "F2-EN3",
+          "lang": "en",
+          "text": "Where are we falling short of target this month?",
+          "set": "main"
+        },
+        {
+          "id": "F2-EN4",
+          "lang": "en",
+          "text": "List the regions that are off track vs plan this month.",
+          "set": "main"
+        },
+        {
+          "id": "F2-EN5",
+          "lang": "en",
+          "text": "Which regions haven't hit their monthly goal?",
+          "set": "main"
+        },
+        {
+          "id": "F2-FR1",
+          "lang": "fr",
+          "text": "Quelles régions sont sous l'objectif ce mois-ci ?",
+          "set": "main"
+        },
+        {
+          "id": "F2-FR2",
+          "lang": "fr",
+          "text": "Quelles régions n'atteignent pas leur budget ce mois-ci ?",
+          "set": "main"
+        },
+        {
+          "id": "F2-FR3",
+          "lang": "fr",
+          "text": "Où est-ce qu'on est en retard sur l'objectif ce mois-ci ?",
+          "set": "main"
+        },
+        {
+          "id": "F2-FR4",
+          "lang": "fr",
+          "text": "Liste des régions en dessous du budget ce mois.",
+          "set": "main"
+        },
+        {
+          "id": "F2-FR5",
+          "lang": "fr",
+          "text": "Quelles régions décrochent par rapport à l'objectif ce mois-ci ?",
+          "set": "main"
+        }
+      ]
+    },
+    {
+      "id": "F3",
+      "name": "Top 10 products by revenue this month",
+      "covered_by_certified_query": true,
+      "what_it_tests": "Covered by a certified query (top products). Also tests revenue vs volume.",
+      "reference_sql": "SELECT p.product_name, ROUND(SUM(f.net_sales)) AS revenue\nFROM bramblepeak_retail.sales.fact_sales f\nJOIN bramblepeak_retail.sales.dim_product p ON f.product_key = p.product_key\nJOIN bramblepeak_retail.sales.dim_date d    ON f.date_key = d.date_key\nWHERE d.year_month = (SELECT MAX(year_month) FROM bramblepeak_retail.sales.dim_date)\nGROUP BY p.product_id, p.product_name\nORDER BY revenue DESC\nLIMIT 10",
+      "compare": {
+        "type": "label_set",
+        "column": "product_name"
+      },
+      "trap_sql": null,
+      "variants": [
+        {
+          "id": "F3-EN1",
+          "lang": "en",
+          "text": "What are our top 10 products by revenue this month?",
+          "set": "main"
+        },
+        {
+          "id": "F3-EN2",
+          "lang": "en",
+          "text": "Show me the 10 best-selling products this month by sales.",
+          "set": "main"
+        },
+        {
+          "id": "F3-EN3",
+          "lang": "en",
+          "text": "Top 10 SKUs by revenue this month",
+          "set": "main"
+        },
+        {
+          "id": "F3-EN4",
+          "lang": "en",
+          "text": "Which ten products brought in the most money this month?",
+          "set": "main"
+        },
+        {
+          "id": "F3-EN5",
+          "lang": "en",
+          "text": "Best sellers this month, top 10 by revenue",
+          "set": "main"
+        },
+        {
+          "id": "F3-FR1",
+          "lang": "fr",
+          "text": "Quels sont nos 10 produits qui font le plus de CA ce mois-ci ?",
+          "set": "main"
+        },
+        {
+          "id": "F3-FR2",
+          "lang": "fr",
+          "text": "Top 10 des produits par chiffre d'affaires ce mois-ci",
+          "set": "main"
+        },
+        {
+          "id": "F3-FR3",
+          "lang": "fr",
+          "text": "Quelles sont les 10 meilleures ventes du mois en valeur ?",
+          "set": "main"
+        },
+        {
+          "id": "F3-FR4",
+          "lang": "fr",
+          "text": "Classement des 10 produits qui rapportent le plus ce mois-ci",
+          "set": "main"
+        },
+        {
+          "id": "F3-FR5",
+          "lang": "fr",
+          "text": "Les 10 références qui génèrent le plus de chiffre ce mois ?",
+          "set": "main"
+        }
+      ]
+    },
+    {
+      "id": "F4",
+      "name": "Online vs stores this month",
+      "covered_by_certified_query": true,
+      "what_it_tests": "Covered by a certified query (channel performance). Tests web / store / digital vocabulary.",
+      "reference_sql": "SELECT s.channel, ROUND(SUM(f.net_sales)) AS revenue\nFROM bramblepeak_retail.sales.fact_sales f\nJOIN bramblepeak_retail.sales.dim_store s ON f.store_key = s.store_key\nJOIN bramblepeak_retail.sales.dim_date d  ON f.date_key = d.date_key\nWHERE d.year_month = (SELECT MAX(year_month) FROM bramblepeak_retail.sales.dim_date)\nGROUP BY s.channel",
+      "compare": {
+        "type": "label_value_map",
+        "label": "channel",
+        "value": "revenue"
+      },
+      "trap_sql": null,
+      "variants": [
+        {
+          "id": "F4-EN1",
+          "lang": "en",
+          "text": "How did Online compare to Retail this month?",
+          "set": "main"
+        },
+        {
+          "id": "F4-EN2",
+          "lang": "en",
+          "text": "Online vs in-store revenue this month?",
+          "set": "main"
+        },
+        {
+          "id": "F4-EN3",
+          "lang": "en",
+          "text": "Split revenue by channel for this month",
+          "set": "main"
+        },
+        {
+          "id": "F4-EN4",
+          "lang": "en",
+          "text": "How much did we sell online versus in stores this month?",
+          "set": "main"
+        },
+        {
+          "id": "F4-EN5",
+          "lang": "en",
+          "text": "Break down this month's revenue between Online and Retail",
+          "set": "main"
+        },
+        {
+          "id": "F4-FR1",
+          "lang": "fr",
+          "text": "Comment se compare le web aux magasins ce mois-ci ?",
+          "set": "main"
+        },
+        {
+          "id": "F4-FR2",
+          "lang": "fr",
+          "text": "CA en ligne vs CA magasins ce mois-ci ?",
+          "set": "main"
+        },
+        {
+          "id": "F4-FR3",
+          "lang": "fr",
+          "text": "Répartition du chiffre d'affaires par canal ce mois-ci",
+          "set": "main"
+        },
+        {
+          "id": "F4-FR4",
+          "lang": "fr",
+          "text": "Combien on a vendu sur internet et en boutique ce mois-ci ?",
+          "set": "main"
+        },
+        {
+          "id": "F4-FR5",
+          "lang": "fr",
+          "text": "Ventes du mois : digital contre physique ?",
+          "set": "main"
+        }
+      ]
+    },
+    {
+      "id": "F5",
+      "name": "Revenue last month",
+      "covered_by_certified_query": false,
+      "what_it_tests": "Time ambiguity: 'last month' = second-latest month in the data. The trap computes the current month, for diagnosis.",
+      "reference_sql": "SELECT ROUND(SUM(f.net_sales)) AS revenue\nFROM bramblepeak_retail.sales.fact_sales f\nJOIN bramblepeak_retail.sales.dim_date d ON f.date_key = d.date_key\nWHERE d.year_month = (SELECT MAX(year_month) FROM bramblepeak_retail.sales.dim_date WHERE year_month < (SELECT MAX(year_month) FROM bramblepeak_retail.sales.dim_date))",
+      "compare": {
+        "type": "scalar",
+        "column": "revenue"
+      },
+      "trap_sql": "SELECT ROUND(SUM(f.net_sales)) AS revenue\nFROM bramblepeak_retail.sales.fact_sales f\nJOIN bramblepeak_retail.sales.dim_date d ON f.date_key = d.date_key\nWHERE d.year_month = (SELECT MAX(year_month) FROM bramblepeak_retail.sales.dim_date)",
+      "variants": [
+        {
+          "id": "F5-EN1",
+          "lang": "en",
+          "text": "What was our total revenue last month?",
+          "set": "main"
+        },
+        {
+          "id": "F5-EN2",
+          "lang": "en",
+          "text": "How much did we sell last month?",
+          "set": "main"
+        },
+        {
+          "id": "F5-EN3",
+          "lang": "en",
+          "text": "Last month's net sales?",
+          "set": "main"
+        },
+        {
+          "id": "F5-EN4",
+          "lang": "en",
+          "text": "Revenue for the previous month",
+          "set": "main"
+        },
+        {
+          "id": "F5-EN5",
+          "lang": "en",
+          "text": "What did we do in sales in the prior month?",
+          "set": "main"
+        },
+        {
+          "id": "F5-FR1",
+          "lang": "fr",
+          "text": "Quel a été notre chiffre d'affaires le mois dernier ?",
+          "set": "main"
+        },
+        {
+          "id": "F5-FR2",
+          "lang": "fr",
+          "text": "Combien on a vendu le mois dernier ?",
+          "set": "main"
+        },
+        {
+          "id": "F5-FR3",
+          "lang": "fr",
+          "text": "CA M-1 ?",
+          "set": "main"
+        },
+        {
+          "id": "F5-FR4",
+          "lang": "fr",
+          "text": "Le CA du mois précédent ?",
+          "set": "main"
+        },
+        {
+          "id": "F5-FR5",
+          "lang": "fr",
+          "text": "Quelles étaient nos ventes totales le mois passé ?",
+          "set": "main"
+        },
+        {
+          "id": "F5-HEN1",
+          "lang": "en",
+          "text": "Total sales for the month before this one?",
+          "set": "holdout"
+        },
+        {
+          "id": "F5-HEN2",
+          "lang": "en",
+          "text": "How did revenue land last month?",
+          "set": "holdout"
+        },
+        {
+          "id": "F5-HFR1",
+          "lang": "fr",
+          "text": "On a fait combien de CA en M-1 ?",
+          "set": "holdout"
+        },
+        {
+          "id": "F5-HFR2",
+          "lang": "fr",
+          "text": "Le CA réalisé le mois d'avant ?",
+          "set": "holdout"
+        }
+      ]
+    },
+    {
+      "id": "F6",
+      "name": "Top-selling region this month",
+      "covered_by_certified_query": false,
+      "what_it_tests": "Business-definition trap: store region (correct) or customer region (trap). Both put Northeast first, so the amount tells them apart (store 475,867 vs customer 456,176 for 2026-10).",
+      "reference_sql": "SELECT s.region, ROUND(SUM(f.net_sales)) AS revenue\nFROM bramblepeak_retail.sales.fact_sales f\nJOIN bramblepeak_retail.sales.dim_store s ON f.store_key = s.store_key\nJOIN bramblepeak_retail.sales.dim_date d  ON f.date_key = d.date_key\nWHERE d.year_month = (SELECT MAX(year_month) FROM bramblepeak_retail.sales.dim_date)\nGROUP BY s.region\nORDER BY revenue DESC\nLIMIT 1",
+      "compare": {
+        "type": "top_label_and_value",
+        "label": "region",
+        "value": "revenue"
+      },
+      "trap_sql": "SELECT c.region, ROUND(SUM(f.net_sales)) AS revenue\nFROM bramblepeak_retail.sales.fact_sales f\nJOIN bramblepeak_retail.sales.dim_customer c ON f.customer_key = c.customer_key\nJOIN bramblepeak_retail.sales.dim_date d     ON f.date_key = d.date_key\nWHERE d.year_month = (SELECT MAX(year_month) FROM bramblepeak_retail.sales.dim_date)\nGROUP BY c.region\nORDER BY revenue DESC\nLIMIT 1",
+      "variants": [
+        {
+          "id": "F6-EN1",
+          "lang": "en",
+          "text": "Which region sold the most this month?",
+          "set": "main"
+        },
+        {
+          "id": "F6-EN2",
+          "lang": "en",
+          "text": "What's our top region by revenue this month?",
+          "set": "main"
+        },
+        {
+          "id": "F6-EN3",
+          "lang": "en",
+          "text": "Best performing region in sales this month?",
+          "set": "main"
+        },
+        {
+          "id": "F6-EN4",
+          "lang": "en",
+          "text": "Where did we generate the most revenue this month?",
+          "set": "main"
+        },
+        {
+          "id": "F6-EN5",
+          "lang": "en",
+          "text": "Which region leads in sales this month?",
+          "set": "main"
+        },
+        {
+          "id": "F6-FR1",
+          "lang": "fr",
+          "text": "Quelle région a le plus vendu ce mois-ci ?",
+          "set": "main"
+        },
+        {
+          "id": "F6-FR2",
+          "lang": "fr",
+          "text": "Quelle est notre meilleure région en CA ce mois-ci ?",
+          "set": "main"
+        },
+        {
+          "id": "F6-FR3",
+          "lang": "fr",
+          "text": "Où est-ce qu'on fait le plus de chiffre ce mois-ci ?",
+          "set": "main"
+        },
+        {
+          "id": "F6-FR4",
+          "lang": "fr",
+          "text": "Région numéro un en ventes ce mois ?",
+          "set": "main"
+        },
+        {
+          "id": "F6-FR5",
+          "lang": "fr",
+          "text": "Quelle région arrive en tête du chiffre d'affaires ce mois-ci ?",
+          "set": "main"
+        }
+      ]
+    },
+    {
+      "id": "F7",
+      "name": "Average order value by channel this month",
+      "covered_by_certified_query": false,
+      "what_it_tests": "Business vocabulary: space B synonyms are in English (AOV, average basket). Does Genie understand 'panier moyen'?",
+      "reference_sql": "SELECT s.channel,\n       ROUND(SUM(f.net_sales) / COUNT(DISTINCT f.order_id), 2) AS avg_order_value\nFROM bramblepeak_retail.sales.fact_sales f\nJOIN bramblepeak_retail.sales.dim_store s ON f.store_key = s.store_key\nJOIN bramblepeak_retail.sales.dim_date d  ON f.date_key = d.date_key\nWHERE d.year_month = (SELECT MAX(year_month) FROM bramblepeak_retail.sales.dim_date)\nGROUP BY s.channel",
+      "compare": {
+        "type": "label_value_map",
+        "label": "channel",
+        "value": "avg_order_value"
+      },
+      "trap_sql": null,
+      "variants": [
+        {
+          "id": "F7-EN1",
+          "lang": "en",
+          "text": "What's the average order value by channel this month?",
+          "set": "main"
+        },
+        {
+          "id": "F7-EN2",
+          "lang": "en",
+          "text": "AOV for Online vs Retail this month?",
+          "set": "main"
+        },
+        {
+          "id": "F7-EN3",
+          "lang": "en",
+          "text": "Average basket size per channel this month",
+          "set": "main"
+        },
+        {
+          "id": "F7-EN4",
+          "lang": "en",
+          "text": "How much does a typical order spend in each channel this month?",
+          "set": "main"
+        },
+        {
+          "id": "F7-EN5",
+          "lang": "en",
+          "text": "Average ticket by channel for the current month",
+          "set": "main"
+        },
+        {
+          "id": "F7-FR1",
+          "lang": "fr",
+          "text": "Quel est le panier moyen par canal ce mois-ci ?",
+          "set": "main"
+        },
+        {
+          "id": "F7-FR2",
+          "lang": "fr",
+          "text": "Panier moyen web vs magasin ce mois-ci ?",
+          "set": "main"
+        },
+        {
+          "id": "F7-FR3",
+          "lang": "fr",
+          "text": "Combien dépense un client par commande, selon le canal, ce mois-ci ?",
+          "set": "main"
+        },
+        {
+          "id": "F7-FR4",
+          "lang": "fr",
+          "text": "Le ticket moyen par canal ce mois ?",
+          "set": "main"
+        },
+        {
+          "id": "F7-FR5",
+          "lang": "fr",
+          "text": "Montant moyen d'une commande en ligne et en magasin ce mois-ci ?",
+          "set": "main"
+        }
+      ]
+    },
+    {
+      "id": "F8",
+      "name": "Share of discounted revenue last quarter",
+      "covered_by_certified_query": false,
+      "what_it_tests": "Filter (discount) + relative quarterly period. Definition used: net revenue of discounted lines / total net revenue, previous full quarter.",
+      "reference_sql": "WITH cur AS (\n  SELECT to_date(concat(MAX(year_month), '-01')) AS m FROM bramblepeak_retail.sales.dim_date\n),\nbounds AS (\n  SELECT add_months(trunc(m, 'QUARTER'), -3) AS q_start, trunc(m, 'QUARTER') AS q_end FROM cur\n)\nSELECT ROUND(100 * SUM(CASE WHEN f.discount_amount > 0 THEN f.net_sales ELSE 0 END)\n             / SUM(f.net_sales), 1) AS discounted_revenue_pct\nFROM bramblepeak_retail.sales.fact_sales f\nJOIN bramblepeak_retail.sales.dim_date d ON f.date_key = d.date_key\nCROSS JOIN bounds b\nWHERE to_date(concat(d.year_month, '-01')) >= b.q_start\n  AND to_date(concat(d.year_month, '-01')) <  b.q_end",
+      "compare": {
+        "type": "scalar",
+        "column": "discounted_revenue_pct",
+        "kind": "pct"
+      },
+      "trap_sql": null,
+      "variants": [
+        {
+          "id": "F8-EN1",
+          "lang": "en",
+          "text": "What share of revenue came from discounted sales last quarter?",
+          "set": "main"
+        },
+        {
+          "id": "F8-EN2",
+          "lang": "en",
+          "text": "What percentage of last quarter's sales were on promotion?",
+          "set": "main"
+        },
+        {
+          "id": "F8-EN3",
+          "lang": "en",
+          "text": "As a percent, how much of last quarter's revenue came from marked-down items?",
+          "set": "main"
+        },
+        {
+          "id": "F8-EN4",
+          "lang": "en",
+          "text": "Discounted revenue as a % of total, previous quarter",
+          "set": "main"
+        },
+        {
+          "id": "F8-EN5",
+          "lang": "en",
+          "text": "Last quarter, what portion of sales had a discount applied?",
+          "set": "main"
+        },
+        {
+          "id": "F8-FR1",
+          "lang": "fr",
+          "text": "Quelle part du CA a été réalisée avec une remise le trimestre dernier ?",
+          "set": "main"
+        },
+        {
+          "id": "F8-FR2",
+          "lang": "fr",
+          "text": "Quel pourcentage des ventes du trimestre précédent était en promo ?",
+          "set": "main"
+        },
+        {
+          "id": "F8-FR3",
+          "lang": "fr",
+          "text": "Part du chiffre d'affaires remisé sur le trimestre dernier ?",
+          "set": "main"
+        },
+        {
+          "id": "F8-FR4",
+          "lang": "fr",
+          "text": "Combien de notre CA du trimestre passé vient de ventes avec réduction, en % ?",
+          "set": "main"
+        },
+        {
+          "id": "F8-FR5",
+          "lang": "fr",
+          "text": "Taux de CA promo le trimestre dernier ?",
+          "set": "main"
+        },
+        {
+          "id": "F8-HEN1",
+          "lang": "en",
+          "text": "In the previous quarter, how much of our revenue was discounted, as a percentage?",
+          "set": "holdout"
+        },
+        {
+          "id": "F8-HEN2",
+          "lang": "en",
+          "text": "Promo share of sales for last quarter?",
+          "set": "holdout"
+        },
+        {
+          "id": "F8-HFR1",
+          "lang": "fr",
+          "text": "Sur le trimestre précédent, quel % du CA a été fait en promo ?",
+          "set": "holdout"
+        },
+        {
+          "id": "F8-HFR2",
+          "lang": "fr",
+          "text": "Poids des ventes remisées dans le CA du dernier trimestre ?",
+          "set": "holdout"
+        }
+      ]
+    }
+  ]
+}
