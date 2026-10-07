@@ -1,8 +1,8 @@
 # Genie Stability Score
 
-Business useres never phrase a question the same way twice:
-"revenue last month", "CA M-1", "how did sales land in septembre". If Genie answers one phrasing tight and another wrong, 
-users cannot tell witch answer to trust. The lab's benchmark checks one phrasing per question; I wented to know whether
+Business users never phrase a question the same way twice:
+"revenue last month", "CA M-1", "how did sales land in September". If Genie answers one phrasing right and another wrong, 
+users cannot tell which answer to trust. The lab's benchmark checks one phrasing per question; I wanted to know whether
 the answer stays the same when the question changes, and what it takes to make it stable.
 
 ## In short
@@ -29,9 +29,9 @@ This exercise reuses that loop and adds what the lab's guides do not cover:
   ([databricks-code-practice](https://github.com/jrlasak/databricks-code-practice), "Build a Genie Space"), on Databricks Free Edition.
 - **Four Genie spaces, same 7 tables:**
   - **A**: tables only, no Genie configuration (Unity Catalog table comments only).
-  - **B**: configured as in the lab: general instructions, 4 joins, 5 measures + 1 filter, 8 example queries, 3 UC functions. English synonyms only. See `space_B_definitions.md`.
-  - **C**: B + business definitions written after diagnosing A and B ("CA" / "M-1", calendar quarters, product = SKU, discounted revenue share). See `space_C_definitions.md`.
-  - **D**: C with the month rule rewritten after C regressed. See `space_D_definitions.md`.
+  - **B**: configured as in the lab: general instructions, 4 joins, 5 measures + 1 filter, 8 example queries, 3 UC functions. English synonyms only. See [space_B_definitions.md](space_B_definitions.md).
+  - **C**: B + business definitions written after diagnosing A and B ("CA" / "M-1", calendar quarters, product = SKU, discounted revenue share). See [space_C_definitions.md](space_C_definitions.md).
+  - **D**: C with the month rule rewritten after C regressed. See [space_D_definitions.md](space_D_definitions.md).
 - **Questions:** 8 business question families x 10 phrasings (5 EN, 5 FR) in `genie_stability_questions.json`, each with a reference SQL query.
   The first EN and FR phrasing of each family is asked 3 times to separate randomness from phrasing effects.
   8 extra phrasings (F5 and F8), written after the diagnosis and never used to build C or D, check whether the fixes generalise.
@@ -58,11 +58,11 @@ month's or this quarter's figure.
 - Space D states the table grain and the exact pattern in the instructions: all 18 "last month" answers and all held-out
   phrasings correct, and the same distinct-period logic now also used for quarters.
 
-Genie rarely fails random: it fails where a business definition, or a property of data was never written down. Writing them down is a business job more than a technical one. And every change must be re-tested on all questions: my first round of defintions fixed one question and made another one worse.
+Genie rarely fails at random: it fails where a business definition, or a property of the data, was never written down. Writing them down is a business job more than a technical one. And every change must be re-tested on all questions: my first round of definitions fixed one question and made another one worse.
 
 ## Examples
 
-Asked "CA M-1?" (French shorthand for last month's revenue), the unconfigured space answered with a Cascade lantern and two customers named Lucas and Carlos. The configured space asked what I meant. Once I defined the term, it understood the question but returned this month's figure. Once the rule also described the date table, it returned the right number. Details in examples/ca_m-1.md.
+Asked "CA M-1?" (French shorthand for last month's revenue), the unconfigured space answered with a Cascade lantern and two customers named Lucas and Carlos. The configured space asked what I meant. Once I defined the term, it understood the question but returned this month's figure. Once the rule also described the date table, it returned the right number. Details in [examples/ca_m-1.md](examples/ca_m-1.md).
 
 ## Limits
 
@@ -73,12 +73,12 @@ Asked "CA M-1?" (French shorthand for last month's revenue), the unconfigured sp
 ## How to reproduce
 
 1. Run the lab's `00_Run_All` notebook to create the data.
-2. Create the Genie spaces and note their IDs (A, B as in the lab, C and D from the definition files).
+2. Create the Genie spaces and note their IDs (A with tables only, B as in the lab, C and D from the definition files).
 3. `01_genie_smoke_test.py`: sends one question through the Genie Conversation API to check access.
 4. `02_genie_runner.py`: asks every phrasing to each space, one new conversation per question, and stores raw answers in a Delta table. Resumes automatically if interrupted.
 5. `03_genie_grading.py`: compares each answer with the reference query and computes accuracy and consistency per space, family and language, plus the held-out results.
 
-Replace `<SPACE_ID_A>` ... `<SPACE_ID_D>` with your own space IDs.
+Import the three notebooks and `genie_stability_questions.json` into the same workspace folder, then replace `<SPACE_ID_A>` ... `<SPACE_ID_D>` with your own space IDs.
 
 ## Credits
 
