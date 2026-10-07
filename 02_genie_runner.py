@@ -12,12 +12,12 @@
 # COMMAND ----------
 
 # ---------- CONFIGURATION ----------
-# Labels as stored in the results table: A = tables only, B = lab configuration, C = + definitions, D = fixed rule
+# One entry per Genie space: label -> space ID
 SPACES = {
-    "A_brut": "<SPACE_ID_A>",
-    "B_configure": "<SPACE_ID_B>",
+    "A_tables_only": "<SPACE_ID_A>",
+    "B_configured": "<SPACE_ID_B>",
     "C_definitions": "<SPACE_ID_C>",
-    "D_fix": "<SPACE_ID_D>",
+    "D_fixed_rule": "<SPACE_ID_D>",
 }
 QUESTIONS_FILE = "genie_stability_questions.json"   # in the same folder as this notebook
 RESULTS_TABLE = "bramblepeak_retail.genie_study.raw_runs"
