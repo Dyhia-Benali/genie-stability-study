@@ -70,6 +70,19 @@ Asked "CA M-1?" (French shorthand for last month's revenue), the unconfigured sp
 - All phrasings, definitions and held-out questions written by me with an AI assistant, not collected from real business users.
 - 8 held-out phrasings is encouraging, not statistical proof.
 
+## Next steps
+
+I have started designing a framework from this study, to make a Genie space reliable for a given company's vocabulary:
+
+1. **Glossary to configuration:** the company's business vocabulary is given to an AI assistant, which drafts the Genie configuration (instructions, synonyms, measures). A person reviews it before it is applied.
+2. **Glossary to tests:** the AI writes many phrasings for each business question. Each question keeps one reference SQL query, validated by a person.
+3. **Words nobody wrote down:** in parallel, a separate source (another model, real user questions, industry glossaries) looks for terms the business uses that are missing from the glossary, like "CA M-1" here, to see how Genie behaves outside what it was taught.
+4. **Re-run after every change:** the same automated grading as in this study. Every gap found goes back into the glossary.
+
+It also addresses this study's limits: real user questions, held-out phrasings written by someone else, several runs per space, and generated SQL in the published results.
+
+Want to see where it's going, or challenge the results? [Let's talk](https://www.linkedin.com/in/dyhia-benali-80176a200/).
+
 ## How to reproduce
 
 1. Run the lab's `00_Run_All` notebook to create the data.
